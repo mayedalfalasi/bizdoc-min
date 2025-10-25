@@ -1,23 +1,36 @@
-async function generateClientPDF(payload) {
-  const { PDFDocument, rgb } = window.PDFLib;
-  const fontBytes = await fetch("/fonts/NotoSans-Regular.ttf").then(r=>r.arrayBuffer());
-  const pdf = await PDFDocument.create(); pdf.registerFontkit(window.fontkit);
-  const font = await pdf.embedFont(fontBytes, { subset:true });
-  const { title="BizDoc Analysis", text="", highlights=[], appendixText="" } = payload||{};
-  const A4=[595.28,841.89], m=56; const page=pdf.addPage(A4); const {width,height}=page.getSize();
-  const norm = s => String(s||"").replace(/\r\n/g,"\n");
-  page.drawText(norm(title),{x:m,y:height-m-20,size:22,font,color:rgb(0,0,0)});
-  let y=height-m-60; for(const h of (highlights||[]).slice(0,15)){ page.drawText(`• ${h.label}: ${h.value}`,{x:m,y,size:11,font,color:rgb(0,0,0)}); y-=18; }
-  const wrap=(t,sz,x,y0,maxW)=>{const w=String(t||"").split(/\s+/); let l="", y=y0, lh=sz*1.5;
-    for(const W of w){const c=l?l+" "+W:W; if(font.widthOfTextAtSize(c,sz)>maxW){ if(l) page.drawText(l,{x,y,size:sz,font,color:rgb(0,0,0)}); y-=lh; l=W;} else l=c;}
-    if(l) page.drawText(l,{x,y,size:sz,font,color:rgb(0,0,0)});};
-  wrap(norm(text),11,m,y-10,width-m*2);
-  if(appendixText){ const p2=pdf.addPage(A4); p2.drawText("Appendix: AI JSON (truncated)",{x:m,y:p2.getSize().height-m-20,size:14,font,color:rgb(0,0,0)});
-    const W=String(appendixText).split(/\s+/); let l="", y2=p2.getSize().height-m-60, lh=15; for(const w of W){const c=l?l+" "+w:w;
-      if(font.widthOfTextAtSize(c,10)>(p2.getSize().width-m*2)){ if(l) p2.drawText(l,{x:m,y:y2,size:10,font,color:rgb(0,0,0)}); y2-=lh; l=w; if(y2<80) break;} else l=c;}
-    if(l && y2>=80) p2.drawText(l,{x:m,y:y2,size:10,font,color:rgb(0,0,0)}); }
-  const bytes = await pdf.save(); const blob = new Blob([bytes],{type:"application/pdf"});
-  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="BizDoc_Report.pdf"; document.body.appendChild(a);
-  a.click(); URL.revokeObjectURL(a.href); a.remove();
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+
+/**
+ * Generate a simple PDF using only built-in fonts (Helvetica).
+ */
+export async function generateClientPDF(data = {}) {
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([595.28, 841.89]); // A4 portrait
+  const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+  const title = data.title || "BizDoc Mini Report";
+  const body = data.body || "Generated with default Helvetica (no custom fonts).";
+
+  const { width, height } = page.getSize();
+
+  page.drawText(title, {
+    x: 50,
+    y: height - 80,
+    size: 24,
+    font: helvetica,
+    color: rgb(0, 0, 0),
+  });
+
+  page.drawText(body, {
+    x: 50,
+    y: height - 120,
+    size: 12,
+    font: helvetica,
+    color: rgb(0, 0, 0),
+    lineHeight: 14,
+    maxWidth: width - 100,
+  });
+
+  const bytes = await pdfDoc.save();
+  return bytes; // Uint8Array
 }
-window.generateClientPDF = generateClientPDF;
