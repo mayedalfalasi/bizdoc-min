@@ -2,6 +2,7 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 /**
  * Generate a simple PDF using only built-in fonts (Helvetica).
+
  */
 export async function generateClientPDF(data = {}) {
   const pdfDoc = await PDFDocument.create();
@@ -9,7 +10,8 @@ export async function generateClientPDF(data = {}) {
   const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
   const title = data.title || "BizDoc Mini Report";
-  const body = data.body || "Generated with default Helvetica (no custom fonts).";
+  const body =
+    data.body || "Generated with default Helvetica (no custom fonts).";
 
   const { width, height } = page.getSize();
 
