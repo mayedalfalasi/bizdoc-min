@@ -1,0 +1,39 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Download DOCX</title>
+<style>
+  body{font-family:system-ui,Arial;margin:24px;max-width:720px}
+  label{display:block;margin:12px 0 6px;font-weight:600}
+  input,textarea,button{width:100%;padding:10px;font-size:16px}
+  textarea{height:240px}
+  button{margin-top:16px;cursor:pointer}
+</style>
+</head><body>
+<h1>Download DOCX</h1>
+<label for="filename">Filename</label>
+<input id="filename" value="report.docx"/>
+<label for="title">Title</label>
+<input id="title" value="DOCX Title"/>
+<label for="body">Body</label>
+<textarea id="body">Line 1
+Line 2
+Line 3</textarea>
+<button id="go">Download DOCX</button>
+<script>
+const APP='https://bizdoc-min.vercel.app';
+document.getElementById('go').addEventListener('click', async () => {
+  const filename=(document.getElementById('filename').value||'report.docx').trim();
+  const title=document.getElementById('title').value||'DOCX Title';
+  const body=document.getElementById('body').value||'';
+  const res=await fetch(`${APP}/api/download-get`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({type:'docx',filename,title,body})
+  });
+  if(!res.ok){ alert('Failed: '+await res.text()); return; }
+  const blob=await res.blob(); const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=filename; a.click();
+  URL.revokeObjectURL(url);
+});
+</script>
+</body></html>

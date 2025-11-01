@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Download TXT</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: ui-sans-serif, system-ui, Arial; margin: 24px; max-width: 720px; }
+    label { display:block; margin:12px 0 6px; font-weight:600; }
+    input, textarea, button { width:100%; padding:10px; font-size:16px; }
+    textarea { height: 240px; }
+    button { margin-top:16px; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <h1>Download TXT</h1>
+
+  <label for="filename">Filename</label>
+  <input id="filename" placeholder="report.txt" value="report.txt" />
+
+  <label for="text">Text</label>
+  <textarea id="text" placeholder="Type the content to include in the TXT file...">Hello from BizDoc.</textarea>
+
+  <button id="dl">Download TXT</button>
+
+  <script>
+    const APP = 'https://bizdoc-min.vercel.app'; // change if your prod URL differs
+
+    document.getElementById('dl').addEventListener('click', async () => {
+      const filename = (document.getElementById('filename').value || 'report.txt').trim();
+      const bodyText = document.getElementById('text').value || '';
+
+      const payload = { type: 'txt', filename, body: bodyText };
+
+      const res = await fetch(`${APP}/api/download-get`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        alert('Failed to generate TXT: ' + (await res.text()));
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename || 'report.txt';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+  </script>
+</body>
+</html>
