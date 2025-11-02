@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BizDoc-Min</title>
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>BizDoc-Min</h1>
+    <p>Upload a PDF to analyze and download your AI-generated report.</p>
+
+    <div class="card">
+      <h2>Upload PDF</h2>
+      <input id="pdfFile" type="file" accept="application/pdf" />
+      <label for="reportName" class="lbl">Report name</label>
+      <input id="reportName" class="input" value="bizdoc_report" />
+      <button id="btnUpload" class="btn">Upload → Analyze → Download PDF</button>
+    </div>
+
+    <div id="log" class="log"></div>
+  </div>
+
+  <script>
+    const log = (msg) => {
+      const e = document.createElement('div');
+      e.textContent = msg;
+      document.getElementById('log').prepend(e);
+    };
+
+    const triggerDownload = (blob, filename) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    document.getElementById('btnUpload').addEventListener('click', async () => {
+      const file = document.getElementById('pdfFile').files[0];
+      const name = document.getElementById('reportName').value || 'bizdoc_report';
+      if (!file) return log('❌ Choose a PDF first');
+      if (file.size > 5 * 1024 * 1024) return log('❌ Max size 5 MB');
+
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          log('🔁 Sending to BizDoc...');
+          const r = await fetch('/api/ocr-upload-analyze-download', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              pdfDataUrl: reader.result,
+              language: 'eng',
+              filename: name
+            })
+          });
+          if (!r.ok) throw new Error(await r.text());
+          const blob = await r.blob();
+          triggerDownload(blob, name + '.pdf');
+          log('✅ Done! PDF downloaded.');
+        } catch (e) {
+          log('❌ ' + e.message);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  </script>
+</body>
+</html>
