@@ -56,7 +56,7 @@ ${String(text).slice(0, 40000)}
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
         temperature: 0.3,
         messages: [
           { role: "system", content: "Return only valid JSON." },
@@ -100,4 +100,4 @@ ${String(text).slice(0, 40000)}
   }
 }
 
-export const config = { api: { bodyParser: false } };
+export const config = { runtime: "nodejs", api: { bodyParser: false } };
