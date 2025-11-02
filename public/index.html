@@ -1,29 +1,93 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>BizDoc — Summarize & Download</title>
-<style>
-  body{margin:0;background:#fff;font-family:system-ui,sans-serif;color:#222;display:flex;align-items:center;justify-content:center;height:100vh}
-  .card{border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.06);padding:36px;text-align:center;max-width:520px;width:92%}
-  h1{margin:0 0 10px} p{color:#555;margin:0 0 18px}
-  input[type=file]{display:block;margin:14px auto 10px;padding:10px;border:1px solid #ddd;border-radius:8px;width:80%}
-  .btn{background:#4fc3f7;color:#fff;border:none;padding:14px 28px;border-radius:10px;cursor:pointer;font-size:16px}
-  .btn:hover{background:#29b6f6} #log{margin-top:14px;color:#333;font-size:14px;min-height:18px}
-</style></head><body>
-<div class="card"><h1>Summarize & Download</h1>
-<p>Upload a PDF (≤ 5 MB). We’ll OCR, analyze with OpenAI, fact-check on the web, add charts, and download a polished report.</p>
-<input id="pdfFile" type="file" accept="application/pdf"/>
-<input id="reportName" value="BizDoc_Summary" style="padding:8px;border:1px solid #ddd;border-radius:8px;width:80%"/>
-<div class="row"><button class="btn" id="go">Download Report</button></div><div id="log"></div></div>
-<script>
-const log=t=>document.getElementById('log').textContent=t;
-const dl=(blob,name)=>{const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u)};
-document.getElementById('go').addEventListener('click',async()=>{
-  const f=document.getElementById('pdfFile').files[0]; const name=(document.getElementById('reportName').value||'BizDoc_Summary').trim();
-  if(!f) return log('Choose a PDF first'); if(f.size>5*1024*1024) return log('Max size 5MB');
-  const reader=new FileReader(); reader.onload=async()=>{
-    try{ log('Analyzing with OpenAI + web research…');
-      const r=await fetch('/api/summarize-download',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({ pdfDataUrl: reader.result, filename: name })});
-      if(!r.ok) throw new Error(await r.text()); const b=await r.blob(); dl(b, name+'.pdf'); log('✅ Done. Report downloaded.');
-    }catch(e){ log('❌ '+(e.message||e)); }
-  }; reader.readAsDataURL(f);
-});
-</script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>BizDoc — Executive Report</title>
+  <style>
+    :root { --blue:#4fc3f7; --ink:#111827; --muted:#6b7280; --line:#e5e7eb; --bg:#ffffff; }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial;color:var(--ink)}
+    .wrap{max-width:880px;margin:56px auto;padding:0 16px}
+    .card{border:1px solid var(--line);border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.06);padding:24px 22px}
+    h1{margin:0 0 8px;font-size:28px}
+    p.sub{margin:0 0 16px;color:var(--muted)}
+    .row{display:grid;grid-template-columns:180px 1fr;gap:14px;align-items:center;margin:12px 0}
+    label{color:var(--muted)}
+    input[type=file], input[type=text]{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px}
+    .hint{color:var(--muted);font-size:13px;margin-top:4px}
+    .hr{height:1px;background:var(--line);margin:16px 0}
+    .btn{display:inline-flex;align-items:center;gap:8px;background:var(--blue);color:#fff;border:none;border-radius:10px;
+         padding:12px 18px;cursor:pointer;font-size:16px}
+    .btn:hover{filter:brightness(0.95)}
+    .status{margin-top:12px;color:var(--muted);min-height:18px}
+    .progress{height:4px;background:var(--line);border-radius:999px;overflow:hidden;margin:8px 0}
+    .progress>div{height:100%;width:0%;background:var(--blue);transition:width .3s}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Executive Report Generator</h1>
+      <p class="sub">Upload a PDF (≤ 5 MB). We’ll OCR, analyze with OpenAI, verify claims on the web, add charts & citations, and download a banker-ready report.</p>
+
+      <div class="row">
+        <label for="pdfFile">Document (PDF)</label>
+        <div>
+          <input id="pdfFile" type="file" accept="application/pdf" />
+          <div class="hint">Scanned or digital PDFs supported.</div>
+        </div>
+      </div>
+
+      <div class="row">
+        <label for="reportName">Output file name</label>
+        <input id="reportName" type="text" value="BizDoc_Summary" />
+      </div>
+
+      <div class="hr"></div>
+      <div class="progress" aria-hidden="true"><div id="bar"></div></div>
+      <button class="btn" id="go">Download Report</button>
+      <div id="status" class="status"></div>
+    </div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const bar = document.getElementById('bar');
+    const set = (msg,pct)=>{ statusEl.textContent = msg; if (pct!=null) bar.style.width = pct + '%'; };
+
+    const dl = (blob, name) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = name; a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    document.getElementById('go').addEventListener('click', async ()=>{
+      const f = document.getElementById('pdfFile').files[0];
+      const name = (document.getElementById('reportName').value || 'BizDoc_Summary').trim();
+      if (!f) return set('Choose a PDF first');
+      if (f.size > 5*1024*1024) return set('Max size is 5 MB');
+
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          set('OCR + ingestion…', 25);
+          const r = await fetch('/api/summarize-download', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ pdfDataUrl: reader.result, filename: name })
+          });
+          set('Formatting final PDF…', 80);
+          if (!r.ok) throw new Error(await r.text());
+          const blob = await r.blob();
+          dl(blob, name + '.pdf');
+          set('✅ Done. Report downloaded.', 100);
+        } catch (e) {
+          set('❌ ' + (e.message || e), 0);
+        }
+      };
+      reader.readAsDataURL(f);
+    });
+  </script>
+</body>
+</html>
