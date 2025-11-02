@@ -100,4 +100,4 @@ ${String(text).slice(0, 40000)}
   }
 }
 
-export const config = { runtime: "nodejs", api: { bodyParser: false } } };
+export const config = { runtime: "nodejs", api: { bodyParser: false } } } };
