@@ -1,3 +1,4 @@
+import { serpSearch } from "../utils/adapters/search-news.js";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { cors } from "../utils/cors.js";
 
@@ -323,6 +324,22 @@ async function buildPdf(filename, a, chartPngs){
     draw(a.trends.narrative);
   }
 
+    // Merge Serp sources into refined.sources (dedupe by URL, fully guarded)
+    try {
+      refined = refined || {};
+      refined.sources = Array.isArray(refined.sources) ? refined.sources : [];
+      const extra = Array.isArray(serp?.results) ? serp.results.map(x => ({ title: x.title, url: x.url })) : [];
+      const seen = new Set(refined.sources.map(s => s && s.url).filter(Boolean));
+      for (const s of extra) {
+        if (s && s.url && !seen.has(s.url)) { refined.sources.push(s); seen.add(s.url); }
+      }
+    } catch(_) {}
+      const seen = new Set(refined.sources.map(s=>s.url));
+      for (const s of serp.results) {
+        if (s.url && !seen.has(s.url)) { refined.sources.push({ title: s.title, url: s.url }); seen.add(s.url); }
+      }
+    }
+
   // Charts
   if (Array.isArray(chartPngs) && chartPngs.length){
     section("Charts");
@@ -376,6 +393,7 @@ export default async function handler(req,res){
     else return res.status(400).json({ ok:false, error:"Provide 'text' OR 'pdfUrl' OR 'pdfDataUrl'." });
 
     // Always-on research
+    const serp = await serpSearch(docText.slice(0,120), 6).catch(()=>({ok:false}));
     const rpack = await research(`Verify and benchmark key claims for: ${docText.slice(0,400)}`, 6);
 
     // Two-pass LLM
