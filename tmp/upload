@@ -1,0 +1,7 @@
+{
+  "ok": true,
+  "detected": "text/plain",
+  "filename": "report",
+  "title": "Upload Pipeline",
+  "body": "This is a TXT that turns into a PDF.\n"
+}
