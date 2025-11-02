@@ -74,19 +74,45 @@ function sanitizeFilename(name) {
 }
 
 async function getDocText({ base, text, pdfUrl, pdfDataUrl, language }) {
-  if (text && String(text).trim().length > 0) return String(text);
+  // 1) If text is provided (non-empty), use it and skip OCR entirely
+  if (typeof text === "string" && text.trim().length > 0) {
+    return String(text);
+  }
 
-  // prefer pdfDataUrl if provided, else pdfUrl
-  if (pdfDataUrl) {
+  // 2) If a DataURL is provided, OCR that (no URL required)
+  if (typeof pdfDataUrl === "string" && pdfDataUrl.startsWith("data:application/pdf;base64,")) {
     const r = await fetch(`${base}/api/ocr-ocrspace`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dataUrl: pdfDataUrl, language })
+      body: JSON.stringify({ dataUrl: pdfDataUrl, language: language || "eng" })
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(`OCR error: ${j?.error || r.statusText}`);
-    return j?.text || j?.preview || ""; // your OCR returns preview/textLength; use preview as fallback
+    return j?.text || j?.preview || "";
   }
+
+  // 3) If a URL is provided, validate and OCR it
+  if (typeof pdfUrl === "string" && pdfUrl.trim().length > 0) {
+    const u = pdfUrl.trim();
+    const isHttp = /^https?:\/\//i.test(u);
+    const isPdf = /\.pdf(\?|#|$)/i.test(u) || u.toLowerCase().endsWith(".pdf");
+    if (!isHttp) throw new Error("OCR error: Invalid or missing URL (must start with http/https)");
+    // not strictly required, but helpful to catch image/docx links
+    if (!isPdf) console.warn("Note: pdfUrl does not end with .pdf — OCR may still work if the server sends a PDF mime-type.");
+
+    const r = await fetch(`${base}/api/ocr-ocrspace`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: u, language: language || "eng" })
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(`OCR error: ${j?.error || r.statusText}`);
+    return j?.text || j?.preview || "";
+  }
+
+  // 4) Nothing valid provided → clear, actionable error (no 500)
+  throw new Error("No input provided: send 'text' or 'pdfUrl' (http/https) or 'pdfDataUrl' (base64).");
+}
 
   if (pdfUrl) {
     const r = await fetch(`${base}/api/ocr-ocrspace`, {
