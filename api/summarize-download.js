@@ -1,29 +1,24 @@
-// Coordinator: uses existing backend routes and never top-level returns.
-// - CORS + OPTIONS
-// - Accepts { text } or { pdfUrl | pdfDataUrl, language }
-// - Calls /api/analyze then /api/download
-// - Optional SerpAPI enrichment (guarded)
+// Coordinator: CORS, text-first; OCR optional; analyze -> download; SerpAPI (guarded)
 export default async function handler(req, res) {
   try {
-    // CORS
+    // --- CORS ---
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
     if (req.method === "OPTIONS") return res.status(200).end();
 
-    // Input
+    // --- Input ---
     const body = typeof req.body === "string" ? safeJSON(req.body) : (req.body || {});
     const { text, pdfUrl, pdfDataUrl, language = "eng", filename = "BizDoc_Summary" } = body;
-
     const base = inferBaseUrl(req);
 
-    // 1) Text first; OCR only if needed
+    // --- 1) Extract text ---
     const docText = await getDocText({ base, text, pdfUrl, pdfDataUrl, language });
 
-    // 2) Analyze
+    // --- 2) Analyze ---
     const analysis = await analyzeText({ base, text: docText, title: filename });
 
-    // 3) Optional SerpAPI enrichment (non-fatal)
+    // --- 3) Optional Serp enrichment ---
     try {
       const serpKey = process.env.SERPAPI_KEY;
       if (serpKey && docText) {
@@ -43,9 +38,8 @@ export default async function handler(req, res) {
       console.error("Serp enrichment error:", e);
     }
 
-    // 4) Render
+    // --- 4) Render PDF ---
     const pdfBytes = await buildPDF({ base, filename, analysis });
-
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${sanitizeFilename(filename)}.pdf"`);
     return res.status(200).send(Buffer.from(pdfBytes));
@@ -63,25 +57,15 @@ export default async function handler(req, res) {
 /* ---------------- helpers ---------------- */
 
 function safeJSON(s){ try { return JSON.parse(s) } catch { return {} } }
-
-function inferBaseUrl(req){
-  const host = req?.headers?.host || "bizdoc-min.vercel.app";
-  return `https://${host}`;
-}
-
-function sanitizeFilename(name){
-  return String(name || "BizDoc_Summary").replace(/[^a-z0-9._-]/gi, "_");
-}
+function inferBaseUrl(req){ const host = req?.headers?.host || "bizdoc-min.vercel.app"; return `https://${host}`; }
+function sanitizeFilename(name){ return String(name || "BizDoc_Summary").replace(/[^a-z0-9._-]/gi, "_"); }
 
 async function getDocText({ base, text, pdfUrl, pdfDataUrl, language }) {
-  // 1) Use text if present
   if (typeof text === "string" && text.trim().length > 0) return String(text);
 
-  // 2) OCR base64
   if (typeof pdfDataUrl === "string" && pdfDataUrl.startsWith("data:application/pdf;base64,")) {
     const r = await fetch(`${base}/api/ocr-ocrspace`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ dataUrl: pdfDataUrl, language })
     });
     const j = await r.json().catch(() => ({}));
@@ -89,14 +73,12 @@ async function getDocText({ base, text, pdfUrl, pdfDataUrl, language }) {
     return j?.text || j?.preview || "";
   }
 
-  // 3) OCR URL
   if (typeof pdfUrl === "string" && pdfUrl.trim().length > 0) {
     const u = pdfUrl.trim();
     const isHttp = /^https?:\/\//i.test(u);
     if (!isHttp) throw new Error("OCR error: Invalid or missing URL (http/https required)");
     const r = await fetch(`${base}/api/ocr-ocrspace`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url: u, language })
     });
     const j = await r.json().catch(() => ({}));
@@ -109,8 +91,7 @@ async function getDocText({ base, text, pdfUrl, pdfDataUrl, language }) {
 
 async function analyzeText({ base, text, title }) {
   const r = await fetch(`${base}/api/analyze`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+    method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, meta: { title } })
   });
   const j = await r.json().catch(() => ({}));
@@ -120,8 +101,7 @@ async function analyzeText({ base, text, title }) {
 
 async function buildPDF({ base, filename, analysis }) {
   const r = await fetch(`${base}/api/download`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+    method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ type: "pdf", filename, analysis })
   });
   const buf = Buffer.from(await r.arrayBuffer());
