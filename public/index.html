@@ -1,91 +1,69 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>BizDoc Report Generator</title>
-  <link rel="icon" href="/favicon.ico" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>BizDoc — Summarize & Download</title>
   <style>
-    body {
-      font-family: system-ui, sans-serif;
-      background: #ffffff;
-      color: #222;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-    }
-    .card {
-      text-align: center;
-      border: 1px solid #ddd;
-      padding: 40px;
-      border-radius: 12px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.08);
-    }
-    h1 { margin-bottom: 20px; font-weight: 600; }
-    input[type=file] {
-      display: block;
-      margin: 20px auto;
-      border: 1px solid #ccc;
-      padding: 10px;
-      border-radius: 8px;
-      width: 250px;
-    }
-    button {
-      background-color: #4fc3f7;
-      color: white;
-      border: none;
-      padding: 14px 28px;
-      border-radius: 10px;
-      cursor: pointer;
-      font-size: 16px;
-      transition: background 0.2s;
-    }
-    button:hover { background-color: #29b6f6; }
-    #status { margin-top: 20px; font-size: 14px; color: #333; }
+    body{margin:0;background:#fff;font-family:system-ui,sans-serif;color:#222;display:flex;align-items:center;justify-content:center;height:100vh}
+    .card{border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.06);padding:36px;text-align:center;max-width:520px;width:92%}
+    h1{margin:0 0 10px}
+    p{color:#555;margin:0 0 18px}
+    input[type=file]{display:block;margin:14px auto 10px;padding:10px;border:1px solid #ddd;border-radius:8px;width:80%}
+    label{font-size:14px;color:#666}
+    .row{margin-top:10px}
+    .btn{background:#4fc3f7;color:#fff;border:none;padding:14px 28px;border-radius:10px;cursor:pointer;font-size:16px}
+    .btn:hover{background:#29b6f6}
+    .toggle{display:flex;align-items:center;gap:8px;justify-content:center;margin-top:8px}
+    #log{margin-top:14px;color:#333;font-size:14px;min-height:18px}
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>BizDoc Report Generator</h1>
-    <input id="pdfFile" type="file" accept="application/pdf" />
-    <button id="generateBtn">Download Report</button>
-    <div id="status"></div>
+    <h1>Summarize & Download</h1>
+    <p>Upload a PDF (≤ 5 MB). We’ll analyze with OpenAI, add charts, and download a polished report.</p>
+    <input id="pdfFile" type="file" accept="application/pdf"/>
+    <div class="row">
+      <label>File name</label><br/>
+      <input id="reportName" value="BizDoc_Summary" style="padding:8px;border:1px solid #ddd;border-radius:8px;width:80%"/>
+    </div>
+    <div class="toggle">
+      <input type="checkbox" id="research" />
+      <label for="research">Fact-check with web research</label>
+    </div>
+    <div class="row">
+      <button class="btn" id="go">Download Report</button>
+    </div>
+    <div id="log"></div>
   </div>
 
   <script>
-    const log = (msg) => { document.getElementById("status").textContent = msg; };
-    const triggerDownload = (blob, filename) => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = filename; a.click();
-      URL.revokeObjectURL(url);
-    };
+    const log = (t)=>{document.getElementById('log').textContent=t};
+    const dl = (blob, name)=>{const u=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=u; a.download=name; a.click(); URL.revokeObjectURL(u)};
 
-    document.getElementById("generateBtn").addEventListener("click", async () => {
-      const file = document.getElementById("pdfFile").files[0];
-      if (!file) return log("❌ Please choose a PDF file first.");
-      if (file.size > 5 * 1024 * 1024) return log("❌ File too large (max 5MB).");
+    document.getElementById('go').addEventListener('click', async ()=>{
+      const f = document.getElementById('pdfFile').files[0];
+      const name = (document.getElementById('reportName').value||'BizDoc_Summary').trim();
+      const research = document.getElementById('research').checked;
+      if(!f) return log('Choose a PDF first'); 
+      if(f.size > 5*1024*1024) return log('Max size 5MB');
 
       const reader = new FileReader();
       reader.onload = async () => {
-        log("⏳ Processing PDF...");
         try {
-          const res = await fetch("/api/ocr-upload-analyze-download", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ pdfDataUrl: reader.result, language: "eng", filename: "BizDoc_Report" }),
+          log('Analyzing with OpenAI…');
+          const r = await fetch('/api/summarize-download', {
+            method:'POST',
+            headers:{'content-type':'application/json'},
+            body: JSON.stringify({ pdfDataUrl: reader.result, filename: name, research })
           });
-          if (!res.ok) throw new Error(await res.text());
-          const blob = await res.blob();
-          triggerDownload(blob, "BizDoc_Report.pdf");
-          log("✅ Report ready and downloaded!");
-        } catch (e) {
-          log("❌ " + e.message);
-        }
+          if(!r.ok) throw new Error(await r.text());
+          const blob = await r.blob();
+          dl(blob, name + '.pdf');
+          log('✅ Done. Report downloaded.');
+        } catch(e){ log('❌ ' + (e.message||e)); }
       };
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(f);
     });
   </script>
 </body>
