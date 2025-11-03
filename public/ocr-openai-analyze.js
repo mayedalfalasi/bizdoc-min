@@ -5,10 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   btn.onclick = async () => {
     const f = input.files?.[0];
-    if (!f) {
-      alert("Please select a PDF file first.");
-      return;
-    }
+    if (!f) { alert("Please select a PDF file first."); return; }
 
     status.textContent = "Uploading and analyzing... please wait ⏳";
 
@@ -18,23 +15,17 @@ document.addEventListener("DOMContentLoaded", () => {
     fd.append("filename", f.name.replace(/\.pdf$/i, "") + "_BizDoc");
 
     try {
-      const res = await fetch("/api/upload-ocr-openai-download", {
-        method: "POST",
-        body: fd,
-      });
-
+      const res = await fetch("/api/upload-ocr-openai-download", { method: "POST", body: fd });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Server error");
       }
-
       const blob = await res.blob();
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = (fd.get("filename") || "BizDoc_Report") + ".pdf";
       a.click();
       URL.revokeObjectURL(a.href);
-
       status.textContent = "✅ Analysis complete — PDF downloaded.";
     } catch (err) {
       console.error("Upload error:", err);
