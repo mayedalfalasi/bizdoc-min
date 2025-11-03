@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BizDoc OCR + OpenAI Analyzer</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; }
+    .box { border: 2px dashed #555; padding: 20px; border-radius: 12px; max-width: 500px; }
+    input[type=file] { width: 100%; margin: 10px 0; }
+    button {
+      background: black; color: white; border: none;
+      padding: 10px 20px; border-radius: 8px; cursor: pointer;
+    }
+    button:hover { background: #222; }
+    #status { margin-top: 15px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>BizDoc OCR + OpenAI Analyzer</h1>
+  <div class="box">
+    <input id="pdfInput" type="file" accept="application/pdf" />
+    <button id="analyzeBtn">Analyze (PDF → OCR → OpenAI → PDF)</button>
+    <p id="status"></p>
+  </div>
+  <script src="./ocr-openai-analyze.js"></script>
+</body>
+</html>
